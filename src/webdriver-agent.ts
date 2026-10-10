@@ -76,6 +76,42 @@ export class WebDriverAgent {
 		return result;
 	}
 
+	public async launchApp(bundleId: string, args?: string[]): Promise<void> {
+		await this.withinSession(async sessionUrl => {
+			const url = `${sessionUrl}/wda/apps/launch`;
+			const response = await fetch(url, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ bundleId, arguments: args || [], shouldWaitForQuiescence: false }),
+			});
+
+			if (!response.ok) {
+				const errorText = await response.text();
+				throw new ActionableError(`Failed to launch ${bundleId} through WebDriverAgent: ${response.status} ${errorText}`);
+			}
+		});
+	}
+
+	public async terminateApp(bundleId: string): Promise<void> {
+		await this.withinSession(async sessionUrl => {
+			const url = `${sessionUrl}/wda/apps/terminate`;
+			const response = await fetch(url, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ bundleId }),
+			});
+
+			if (!response.ok) {
+				const errorText = await response.text();
+				throw new ActionableError(`Failed to terminate ${bundleId} through WebDriverAgent: ${response.status} ${errorText}`);
+			}
+		});
+	}
+
 	public async getScreenSize(sessionUrl?: string): Promise<ScreenSize> {
 		if (sessionUrl) {
 			const url = `${sessionUrl}/wda/screen`;

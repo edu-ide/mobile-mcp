@@ -187,20 +187,35 @@ export class IosRobot implements Robot {
 
 	public async launchApp(packageName: string, locale?: string): Promise<void> {
 		validatePackageName(packageName);
-		await this.assertTunnelRunning();
-		const args = ["launch", packageName];
+
+		const launchArgs: string[] = [];
 		if (locale) {
 			validateLocale(locale);
 			const locales = locale.split(",").map(l => l.trim());
-			args.push("-AppleLanguages", `(${locales.join(", ")})`);
-			args.push("-AppleLocale", locales[0]);
+			launchArgs.push("-AppleLanguages", `(${locales.join(", ")})`);
+			launchArgs.push("-AppleLocale", locales[0]);
 		}
 
-		await this.ios(...args);
+		// without go-ios (MOBILEMCP_WDA_URL), launch through WebDriverAgent instead
+		if (getWdaUrlOverride()) {
+			const wda = await this.wda();
+			await wda.launchApp(packageName, launchArgs);
+			return;
+		}
+
+		await this.assertTunnelRunning();
+		await this.ios("launch", packageName, ...launchArgs);
 	}
 
 	public async terminateApp(packageName: string): Promise<void> {
 		validatePackageName(packageName);
+
+		if (getWdaUrlOverride()) {
+			const wda = await this.wda();
+			await wda.terminateApp(packageName);
+			return;
+		}
+
 		await this.assertTunnelRunning();
 		await this.ios("kill", packageName);
 	}
