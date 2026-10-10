@@ -60,6 +60,22 @@ const getWdaUrlOverride = (): URL | undefined => {
 	return url;
 };
 
+// when WebDriverAgent is reached directly (MOBILEMCP_WDA_URL), the device may not be visible to go-ios
+// (for example a Wi-Fi only iPhone). Expose it anyway so tools can target it.
+const getWdaUrlDevice = (): (IosDevice & { version: string }) | undefined => {
+	const wdaUrl = getWdaUrlOverride();
+	if (!wdaUrl) {
+		return undefined;
+	}
+
+	const deviceId = process.env.MOBILEMCP_WDA_UDID || `wda-${wdaUrl.hostname}`;
+	return {
+		deviceId,
+		deviceName: process.env.MOBILEMCP_WDA_NAME || `WebDriverAgent (${wdaUrl.host})`,
+		version: process.env.MOBILEMCP_WDA_IOS_VERSION || "",
+	};
+};
+
 export class IosRobot implements Robot {
 
 	public constructor(private deviceId: string) {
@@ -298,7 +314,12 @@ export class IosManager {
 	}
 
 	public listDevices(): IosDevice[] {
+		const wdaDevice = getWdaUrlDevice();
 		if (!this.isGoIosInstalled()) {
+			if (wdaDevice) {
+				return [{ deviceId: wdaDevice.deviceId, deviceName: wdaDevice.deviceName }];
+			}
+
 			console.error("go-ios is not installed, no physical iOS devices can be detected");
 			return [];
 		}
@@ -310,11 +331,20 @@ export class IosManager {
 			deviceName: this.getDeviceName(device),
 		}));
 
+		if (wdaDevice && !devices.some(d => d.deviceId === wdaDevice.deviceId)) {
+			devices.push({ deviceId: wdaDevice.deviceId, deviceName: wdaDevice.deviceName });
+		}
+
 		return devices;
 	}
 
 	public listDevicesWithDetails(): Array<IosDevice & { version: string }> {
+		const wdaDevice = getWdaUrlDevice();
 		if (!this.isGoIosInstalled()) {
+			if (wdaDevice) {
+				return [wdaDevice];
+			}
+
 			console.error("go-ios is not installed, no physical iOS devices can be detected");
 			return [];
 		}
@@ -329,6 +359,10 @@ export class IosManager {
 				version: info.ProductVersion,
 			};
 		});
+
+		if (wdaDevice && !devices.some(d => d.deviceId === wdaDevice.deviceId)) {
+			devices.push(wdaDevice);
+		}
 
 		return devices;
 	}
